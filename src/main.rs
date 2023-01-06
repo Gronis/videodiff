@@ -87,7 +87,6 @@ fn extract_frames<const W: usize, const H: usize>(in_file: &str, skip_start_secs
         "0",
         "-frame_pts",
         "true",
-        // "-t", "00:10:10", // remove later
         "-c:v",
         "targa",
         "-f",
@@ -281,16 +280,29 @@ fn append_mean_and_variance<'a, const W: usize, const H: usize>(
     (frame, (mean, variance))
 }
 
+// Smaller image hashes produces more hits and executes faster.
 const WIDTH: usize = 20;
 const HEIGHT: usize = 20;
+
+const LONG_DESCRIPTION: &str = "
+Typical usage is to sync the audio of two versions of the same video.
+This software compares the photage and provides an offset and scale
+for adjusting the target file audio so that it matches the reference file.
+
+NOTE: Requires ffmpeg to be installed.
+
+Use ffmpeg or similar to sync the audio after a result is provided.
+  ffmpeg -i ref.mp4 -itsoffset {itsoffset} -i target.mp4 -filter:a:1 \"atempo={atempo}\"
+";
 
 fn main() {
     ///////////////////////////////////////////////////////////////////////////////////////////
     //  Argument parsing
     ///////////////////////////////////////////////////////////////////////////////////////////
-    let args = Command::new("diffvid")
+    let args = Command::new("videodiff")
         .version("0.1.0")
-        .about("Extract images from file")
+        .about("Find time offset and scaling between two versions of the same video.")
+        .after_help(LONG_DESCRIPTION)
         .arg(Arg::new("ref_file").required(true))
         .arg(Arg::new("target_file").required(true))
         .arg(
@@ -354,7 +366,7 @@ fn main() {
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Find good, distinct frames and the difference in time between frames from both sources
     ///////////////////////////////////////////////////////////////////////////////////////////
-    eprintln!("Comparing frames (slow)...");
+    eprintln!("Comparing frames... (slow)");
     let matched_frames_ref: HashMap<&Frame<WIDTH, HEIGHT>, (Mean, Variance)> = frames_ref
         .iter()
         .map(|frame| append_mean_and_variance(&table_ref, frame))
@@ -397,7 +409,8 @@ fn main() {
 
     // // Debug print samples
     // for (frame_nr, (ref_ts, tar_ts)) in ref_and_target_timestamps.iter() {
-    //     eprintln!("    - {}:\t{:.2},   \t{:.2}", frame_nr, ref_ts, tar_ts);
+    //     // eprintln!("    - {}:\t{:.2},   \t{:.2}", frame_nr, ref_ts, tar_ts);
+    //     eprintln!("{},{:.5},{:.5}", frame_nr, ref_ts, tar_ts);
     // }
 
     ///////////////////////////////////////////////////////////////////////////////////////////
