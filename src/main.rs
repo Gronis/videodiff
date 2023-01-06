@@ -430,22 +430,22 @@ fn main() {
     let evaluate_fit = |offset: f64, scale: f64| {
         let mut error = 0.0;
 
-        let sample_count_12_percent = ref_and_target_timestamps.len() >> 3;
+        // let sample_count_12_percent = ref_and_target_timestamps.len() >> 3;
         
-        // Add extra error weight to last and first 12.5% of frames.
-        for (_, (ref_ts, target_ts)) in &ref_and_target_timestamps[0..sample_count_12_percent] {
-            error += (ref_ts - target_ts * scale + offset).powi(2) * 5.0;
-        }
-        // Put extra weight on errors within the last 12.5% frames of the video, since scaling errors
-        // are accumulated the later the timestamp gets.
-        for (_, (ref_ts, target_ts)) in
-            &ref_and_target_timestamps[ref_and_target_timestamps.len() - sample_count_12_percent..]
-        {
-            error += (ref_ts - target_ts * scale + offset).powi(2) * 10.0;
-        }
+        // // Add extra error weight to last and first 12.5% of frames.
+        // for (_, (ref_ts, target_ts)) in &ref_and_target_timestamps[0..sample_count_12_percent] {
+        //     error += (ref_ts - target_ts * scale + offset).powi(2) * 5.0;
+        // }
+        // // Put extra weight on errors within the last 12.5% frames of the video, since scaling errors
+        // // are accumulated the later the timestamp gets.
+        // for (_, (ref_ts, target_ts)) in
+        //     &ref_and_target_timestamps[ref_and_target_timestamps.len() - sample_count_12_percent..]
+        // {
+        //     error += (ref_ts - target_ts * scale + offset).powi(2) * 10.0;
+        // }
         // Add normal error for each frame
         for (_, (ref_ts, target_ts)) in &ref_and_target_timestamps {
-            error += (ref_ts - target_ts * scale + offset).abs();
+            error += (ref_ts - target_ts * scale + offset).powi(2);
         }
         error
     };
