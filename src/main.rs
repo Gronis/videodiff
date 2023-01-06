@@ -71,13 +71,11 @@ impl<const W: usize, const H: usize> PartialEq for Frame<W, H> {
 
 impl<const W: usize, const H: usize> Eq for Frame<W, H> {}
 
-fn extract_frames<const W: usize, const H: usize>(in_file: &str, skip_start_secs: f32) -> Output {
+fn extract_frames<const W: usize, const H: usize>(in_file: &str) -> Output {
     let filter = format!("[0:v:0]scale={W}:{H}");
-    let skip_start_secs = format!("{skip_start_secs}");
     let args = vec![
         // "-ss",
         // "5",
-        // &skip_start_secs,
         "-i",
         in_file,
         "-map",
@@ -335,14 +333,14 @@ fn main() {
     ///////////////////////////////////////////////////////////////////////////////////////////
     let load_frames = move |file_path: String| {
         eprintln!("Extracting frames from {file_path}...");
-        let output = extract_frames::<WIDTH, HEIGHT>(&file_path, skip_start);
+        let output = extract_frames::<WIDTH, HEIGHT>(&file_path);
         let bytestream = output.stdout;
         let fps = parse_fps(output.stderr);
         eprintln!("  - Fps: {}", fps);
         eprintln!("Decoding frames...");
         let images = images_from_bytestream(&bytestream);
         eprintln!("  - Got {} images.", images.len());
-        let range = (skip_end * fps) as usize..(images.len() - (skip_end * fps) as usize);
+        let range = (skip_start * fps) as usize..(images.len() - (skip_end * fps) as usize);
         eprintln!("Computing hashes...");
         let frames = make_frames::<WIDTH, HEIGHT>(&images[range], fps);
         return frames;
@@ -413,10 +411,10 @@ fn main() {
     eprintln!("  - Got {} comparable frames", ref_and_target_timestamps.len());
 
     // // Debug print samples
-    for (frame_nr, (ref_ts, tar_ts)) in ref_and_target_timestamps.iter() {
-        eprintln!("    - {}:\t{:.2},   \t{:.2}", frame_nr, ref_ts, tar_ts);
-        // eprintln!("{},{:.5},{:.5}", frame_nr, ref_ts, tar_ts);
-    }
+    // for (frame_nr, (ref_ts, tar_ts)) in ref_and_target_timestamps.iter() {
+    //     eprintln!("    - {}:\t{:.2},   \t{:.2}", frame_nr, ref_ts, tar_ts);
+    //     // eprintln!("{},{:.5},{:.5}", frame_nr, ref_ts, tar_ts);
+    // }
 
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Solve time difference (offset + scale) with bird/partical swarm optimization
@@ -445,9 +443,8 @@ fn main() {
         {
             error += (ref_ts - target_ts * scale + offset).powi(2) * 10.0;
         }
-        let nr_samples = ref_and_target_timestamps.len() as f64;
-        for (i,(_, (ref_ts, target_ts))) in ref_and_target_timestamps.iter().enumerate() {
-            // error += (ref_ts - target_ts * scale + offset).powi(2) * (i as f64 / nr_samples);
+        // Add normal error for each frame
+        for (_, (ref_ts, target_ts)) in &ref_and_target_timestamps {
             error += (ref_ts - target_ts * scale + offset).abs();
         }
         error
@@ -494,7 +491,7 @@ fn main() {
             if score.round() < best_score.round() {
                 let offset_label = if best_offset < 0.0 { "itsoffset" } else { "       ss" };
                 eprintln!(
-                    "  - [Result] - {offset_label}: {:.5}s, atempo: {:.8}, score: {:.2}",
+                    "  - [Result] - {offset_label}: {:.5}s, atempo: {:.8}, error: {:.2}",
                     best_offset.abs(),
                     1.0 / best_scale,
                     best_score
@@ -515,15 +512,15 @@ fn main() {
     let ((best_offset, best_scale), best_score) = best;
     let offset_label = if best_offset < 0.0 { "itsoffset" } else { "       ss" };
     eprintln!(
-        "  - [Result] - {offset_label}: {:.5}s, atempo: {:.8}, score: {:.2}",
+        "  - [Result] - {offset_label}: {:.5}s, atempo: {:.8}, error: {:.2}",
         best_offset.abs(),
         1.0 / best_scale,
         best_score
     );
-    if best_score as usize > ref_and_target_timestamps.len() * 2 {
+    if best_score as usize > ref_and_target_timestamps.len() {
         eprintln!(
-            "Warning! Average frame error is over {}, which means that the fit might be bad.",
-            best_score
+            "Warning! Average frame error is {:.2}, which means that the fit is probably bad.",
+            best_score as f64 / ref_and_target_timestamps.len() as f64
         );
     }
 }
