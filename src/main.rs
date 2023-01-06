@@ -75,8 +75,9 @@ fn extract_frames<const W: usize, const H: usize>(in_file: &str, skip_start_secs
     let filter = format!("[0:v:0]scale={W}:{H}");
     let skip_start_secs = format!("{skip_start_secs}");
     let args = vec![
-        "-ss",
-        &skip_start_secs,
+        // "-ss",
+        // "5",
+        // &skip_start_secs,
         "-i",
         in_file,
         "-map",
@@ -84,9 +85,9 @@ fn extract_frames<const W: usize, const H: usize>(in_file: &str, skip_start_secs
         "-filter_complex",
         &filter,
         "-vsync",
-        "0",
-        "-frame_pts",
-        "true",
+        "cfr",
+        // "-frame_pts",
+        // "true",
         "-c:v",
         "targa",
         "-f",
@@ -272,7 +273,7 @@ fn append_mean_and_variance<'a, const W: usize, const H: usize>(
             let timestamp = other_frame.timestamp;
             (score, timestamp)
         })
-        .filter(|(score, _)| *score > 0.65)
+        .filter(|(score, _)| *score > 0.75)
         .map(|(_, timestamp)| timestamp as f64);
     let mean: Mean = it.clone().collect();
     let variance: Variance = it.collect();
@@ -341,7 +342,7 @@ fn main() {
         eprintln!("Decoding frames...");
         let images = images_from_bytestream(&bytestream);
         eprintln!("  - Got {} images.", images.len());
-        let range = 0..=(images.len() - (skip_end * fps) as usize);
+        let range = (skip_end * fps) as usize..(images.len() - (skip_end * fps) as usize);
         eprintln!("Computing hashes...");
         let frames = make_frames::<WIDTH, HEIGHT>(&images[range], fps);
         return frames;
@@ -388,35 +389,39 @@ fn main() {
             let Some((mean2, var2)) = matched_frames_target.get(frame) else { return None };
             let var_factor = var.sample_variance() / var2.sample_variance();
             // If variance is similar, assume comparison of frames are good
-            if var_factor < 0.57 || var_factor > 1.83 {
+            if var_factor < 0.7 || var_factor > 1.3 {
                 return None;
             };
             Some((frame.frame_nr, (mean.mean(), mean2.mean())))
         })
         .collect();
 
+    // Sort by frame order
     ref_and_target_timestamps
         .sort_by(|(self_nr, _), (other_nr, _)| self_nr.partial_cmp(&other_nr).unwrap());
 
-    if ref_and_target_timestamps.len() < 100 {
-        eprintln!(
-            "Error, too few samples, only got {} similar frames.",
-            ref_and_target_timestamps.len()
-        );
-        return;
-    }
+    // Drop non-monotonic target frames (Almost always a cause of false-positive image hash hit in target)
+    let ref_and_target_timestamps: Vec<_> = ref_and_target_timestamps
+        .windows(3)
+        .flat_map(|arg| { 
+            let [(_, (_, mean1)), (_, (_, mean2)), (_, (_, mean3))] = arg else { return None }; 
+            let [_, val, _] = arg else { return None };
+            if *mean1 <= *mean2 && *mean2 <= *mean3 { Some(val) } else { None }
+        })
+        .collect();
+
     eprintln!("  - Got {} comparable frames", ref_and_target_timestamps.len());
 
     // // Debug print samples
-    // for (frame_nr, (ref_ts, tar_ts)) in ref_and_target_timestamps.iter() {
-    //     // eprintln!("    - {}:\t{:.2},   \t{:.2}", frame_nr, ref_ts, tar_ts);
-    //     eprintln!("{},{:.5},{:.5}", frame_nr, ref_ts, tar_ts);
-    // }
+    for (frame_nr, (ref_ts, tar_ts)) in ref_and_target_timestamps.iter() {
+        eprintln!("    - {}:\t{:.2},   \t{:.2}", frame_nr, ref_ts, tar_ts);
+        // eprintln!("{},{:.5},{:.5}", frame_nr, ref_ts, tar_ts);
+    }
 
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Solve time difference (offset + scale) with bird/partical swarm optimization
     ///////////////////////////////////////////////////////////////////////////////////////////
-    eprintln!("Optimizing offset and timestamp scale...");
+    eprintln!("Optimizing offset and scale...");
 
     struct Bird {
         pos: (f64, f64),
@@ -426,17 +431,23 @@ fn main() {
 
     let evaluate_fit = |offset: f64, scale: f64| {
         let mut error = 0.0;
+
+        let sample_count_12_percent = ref_and_target_timestamps.len() >> 3;
         
-        // Add extra error weight to last 100 and first 100 frames.
-        for (_, (ref_ts, target_ts)) in &ref_and_target_timestamps[0..100] {
-            error += (ref_ts - target_ts * scale + offset).powi(2);
+        // Add extra error weight to last and first 12.5% of frames.
+        for (_, (ref_ts, target_ts)) in &ref_and_target_timestamps[0..sample_count_12_percent] {
+            error += (ref_ts - target_ts * scale + offset).powi(2) * 5.0;
         }
+        // Put extra weight on errors within the last 12.5% frames of the video, since scaling errors
+        // are accumulated the later the timestamp gets.
         for (_, (ref_ts, target_ts)) in
-            &ref_and_target_timestamps[ref_and_target_timestamps.len() - 100..]
+            &ref_and_target_timestamps[ref_and_target_timestamps.len() - sample_count_12_percent..]
         {
-            error += (ref_ts - target_ts * scale + offset).powi(2);
+            error += (ref_ts - target_ts * scale + offset).powi(2) * 10.0;
         }
-        for (_, (ref_ts, target_ts)) in &ref_and_target_timestamps {
+        let nr_samples = ref_and_target_timestamps.len() as f64;
+        for (i,(_, (ref_ts, target_ts))) in ref_and_target_timestamps.iter().enumerate() {
+            // error += (ref_ts - target_ts * scale + offset).powi(2) * (i as f64 / nr_samples);
             error += (ref_ts - target_ts * scale + offset).abs();
         }
         error
@@ -481,9 +492,10 @@ fn main() {
             let score = evaluate_fit(bird.pos.0, bird.pos.1);
             let ((best_offset, best_scale), best_score) = best;
             if score.round() < best_score.round() {
+                let offset_label = if best_offset < 0.0 { "itsoffset" } else { "       ss" };
                 eprintln!(
-                    "  - [Result] - itsoffset: {:.5}s, atempo: {:.8}, score: {:.2}",
-                    -best_offset,
+                    "  - [Result] - {offset_label}: {:.5}s, atempo: {:.8}, score: {:.2}",
+                    best_offset.abs(),
                     1.0 / best_scale,
                     best_score
                 );
@@ -501,9 +513,10 @@ fn main() {
         }
     }
     let ((best_offset, best_scale), best_score) = best;
+    let offset_label = if best_offset < 0.0 { "itsoffset" } else { "       ss" };
     eprintln!(
-        "  - [Result] - itsoffset: {:.5}s, atempo: {:.8}, score: {:.2}",
-        -best_offset,
+        "  - [Result] - {offset_label}: {:.5}s, atempo: {:.8}, score: {:.2}",
+        best_offset.abs(),
         1.0 / best_scale,
         best_score
     );
