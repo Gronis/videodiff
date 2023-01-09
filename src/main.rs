@@ -393,26 +393,38 @@ fn main() {
             Some((frame.frame_nr, (mean.mean(), mean2.mean())))
         })
         .collect();
+    eprintln!("  - Got {} comparable frames", ref_and_target_timestamps.len());
 
     // Sort by frame order
     ref_and_target_timestamps
         .sort_by(|(self_nr, _), (other_nr, _)| self_nr.partial_cmp(&other_nr).unwrap());
 
-    // Drop non-monotonic target frames (Almost always a cause of false-positive image hash hit in target)
-    let ref_and_target_timestamps: Vec<_> = ref_and_target_timestamps
-        .windows(3)
-        .flat_map(|arg| { 
-            let [(_, (_, mean1)), (_, (_, mean2)), (_, (_, mean3))] = arg else { return None }; 
-            let [_, val, _] = arg else { return None };
-            if *mean1 <= *mean2 && *mean2 <= *mean3 { Some(val) } else { None }
-        })
-        .collect();
-
-    eprintln!("  - Got {} comparable frames", ref_and_target_timestamps.len());
+    ///////////////////////////////////////////////////////////////////////////////////////////
+    // Drop non-monotonous frames (Almost always a cause of false-positive image hash hit in target)
+    ///////////////////////////////////////////////////////////////////////////////////////////
+    eprintln!("Dropping non-monotonous frames...");
+    let non_monotonous_frames_count = ref_and_target_timestamps.len();
+    loop {
+        let old_sample_size = ref_and_target_timestamps.len();
+        ref_and_target_timestamps = ref_and_target_timestamps
+            .windows(3)
+            .flat_map(|arg| { 
+                let [(_, (_, mean1)), (_, (_, mean2)), (_, (_, mean3))] = arg else { return None }; 
+                let [_, val, _] = arg else { return None };
+                if *mean1 <= *mean2 && *mean2 <= *mean3 { Some(*val) } else { None }
+            })
+            .collect();
+        if old_sample_size - ref_and_target_timestamps.len() <= 2 { break }
+    };
+    let monotonous_frames_count = ref_and_target_timestamps.len();
+    eprintln!("  - Got {} comparable frames, {} dropped", 
+        monotonous_frames_count, 
+        non_monotonous_frames_count - monotonous_frames_count
+    );
 
     // // Debug print samples
     // for (frame_nr, (ref_ts, tar_ts)) in ref_and_target_timestamps.iter() {
-    //     eprintln!("    - {}:\t{:.2},   \t{:.2}", frame_nr, ref_ts, tar_ts);
+    //     // eprintln!("    - {}:\t{:.2},   \t{:.2}", frame_nr, ref_ts, tar_ts);
     //     // eprintln!("{},{:.5},{:.5}", frame_nr, ref_ts, tar_ts);
     // }
 
@@ -453,18 +465,18 @@ fn main() {
     let sample_range = |min, max| rand::random::<f64>() * (max - min) + min;
 
     let spawn_bird = || Bird {
-        pos: (sample_range(-10.0, 10.0), sample_range(0.99, 1.01)),
+        pos: (sample_range(-30.0, 30.0), sample_range(0.99, 1.01)),
         vel: (0.0, 0.0),
         best: ((0.0, 1.0), 1_000_000.0),
     };
 
-    let mut swarm: Vec<_> = (0..10).map(|_| spawn_bird()).collect();
-    let mut best: ((f64, f64), f64) = ((0.0, 1.0), 1_000_000.0);
+    let mut swarm: Vec<_> = (0..30).map(|_| spawn_bird()).collect();
+    let mut best: ((f64, f64), f64) = ((2.0, 1.0), 1_000_000.0);
     let mut bird_weight = 0.6;
     let personal_weight = 0.1;
     let global_weight = 0.05;
 
-    for _ in 0..400_000 {
+    for _ in 0..200_000 {
         for bird in &mut swarm {
             // Calculate global and local
             let global_direction = (best.0 .0 - bird.pos.0, best.0 .1 - bird.pos.1);
