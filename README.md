@@ -79,15 +79,15 @@ Optimizing offset and scale...
   - [Result] - itsoffset: 0.15528s, atempo: 0.99901764, error: 24.67
 ```
 
-## I still don't understand
-
-Look at the discussions [here](https://github.com/Gronis/videodiff/issues/1#issuecomment-1595782324) and see if it helps.
-
 This can be used with ffmpeg to sync like so:
 
 ```
 ffmpeg -i ~/video_ref.mkv -itsoffset 0.15528 -i ~/video_target.mkv -filter:a:1 "atempo=0.99901764" -map 0 -map 1:a -c:v copy -c:a:0 copy -c:a:1 libopus -b:a:1 96k ~/out.mkv
 ```
+
+## I still don't understand
+
+Look at the discussions [here](https://github.com/Gronis/videodiff/issues/1#issuecomment-1595782324) and see if it helps.
 
 ## Notes
 More options should probably be tunable via cli.
