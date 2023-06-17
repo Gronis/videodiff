@@ -72,20 +72,28 @@ impl<const W: usize, const H: usize> PartialEq for Frame<W, H> {
 impl<const W: usize, const H: usize> Eq for Frame<W, H> {}
 
 fn extract_frames<const W: usize, const H: usize>(in_file: &str) -> Output {
-    let filter = format!("[0:v:0]scale={W}:{H}");
+    let filter = format!("[0:v:0]scale={W}:{H}[v];");
     let args = vec![
         // "-ss",
-        // "5",
+        // "0",
         "-i",
         in_file,
-        "-map",
-        "0:v",
         "-filter_complex",
         &filter,
-        "-vsync",
-        "cfr",
+
+        "-map",
+        "[v]",
+
+        // "-t",
+        // "00:00:10",
+
+        // "-vsync",
+        // "0",
+        // "cfr",
+
         // "-frame_pts",
         // "true",
+        
         "-c:v",
         "targa",
         "-f",
@@ -152,7 +160,7 @@ fn images_from_bytestream(data: &[u8]) -> Vec<Tga<Rgb888>> {
         }
         end += 18;
         if let Ok(frame) = Tga::from_slice(&data[start..end]) {
-            // println!("{}: [{}, {}]",frames.len(), start, end);
+            // println!("{}: [{}, {}] size: {}",frames.len(), start, end, end-start);
             frames.push(frame);
             start = end;
         }
@@ -275,7 +283,7 @@ fn append_mean_and_variance<'a, const W: usize, const H: usize>(
         .map(|(_, timestamp)| timestamp as f64);
     let mean: Mean = it.clone().collect();
     let variance: Variance = it.collect();
-    // eprintln!("{}: {}, +-{}", frame.frame_nr, mean.mean(), variance.sample_variance());
+    // eprintln!("{}: {}, +-{}\t diff:{}", frame.frame_nr, mean.mean(), variance.sample_variance(), frame.timestamp as f64 - mean.mean());
     (frame, (mean, variance))
 }
 
@@ -404,7 +412,7 @@ fn main() {
     ///////////////////////////////////////////////////////////////////////////////////////////
     eprintln!("Dropping non-monotonous frames...");
     let non_monotonous_frames_count = ref_and_target_timestamps.len();
-    loop {
+    for _ in 0..10 {
         let old_sample_size = ref_and_target_timestamps.len();
         ref_and_target_timestamps = ref_and_target_timestamps
             .windows(3)
@@ -457,6 +465,7 @@ fn main() {
         // }
         // Add normal error for each frame
         for (_, (ref_ts, target_ts)) in &ref_and_target_timestamps {
+            // error += (ref_ts - target_ts * scale + offset).abs();
             error += (ref_ts - target_ts * scale + offset).powi(2);
         }
         error
@@ -471,7 +480,7 @@ fn main() {
     };
 
     let mut swarm: Vec<_> = (0..30).map(|_| spawn_bird()).collect();
-    let mut best: ((f64, f64), f64) = ((2.0, 1.0), 1_000_000.0);
+    let mut best: ((f64, f64), f64) = ((0.0, 1.0), 1_000_000.0);
     let mut bird_weight = 0.6;
     let personal_weight = 0.1;
     let global_weight = 0.05;
