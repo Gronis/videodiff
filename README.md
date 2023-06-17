@@ -79,6 +79,10 @@ Optimizing offset and scale...
   - [Result] - itsoffset: 0.15528s, atempo: 0.99901764, error: 24.67
 ```
 
+## I still don't understand
+
+Look at the discussions [here](https://github.com/Gronis/videodiff/issues/1#issuecomment-1595782324) and see if it helps.
+
 This can be used with ffmpeg to sync like so:
 
 ```
