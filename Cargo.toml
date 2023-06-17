@@ -12,3 +12,6 @@ embedded-graphics = "0.7.1"
 rand = "0.8.5"
 tinytga = "0.4.1"
 xshell = "0.2.3"
+
+[profile.release]
+lto = true

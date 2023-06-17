@@ -93,7 +93,7 @@ fn extract_frames<const W: usize, const H: usize>(in_file: &str) -> Output {
 
         // "-frame_pts",
         // "true",
-        
+
         "-c:v",
         "targa",
         "-f",
@@ -412,7 +412,7 @@ fn main() {
     ///////////////////////////////////////////////////////////////////////////////////////////
     eprintln!("Dropping non-monotonous frames...");
     let non_monotonous_frames_count = ref_and_target_timestamps.len();
-    for _ in 0..10 {
+    loop {
         let old_sample_size = ref_and_target_timestamps.len();
         ref_and_target_timestamps = ref_and_target_timestamps
             .windows(3)
