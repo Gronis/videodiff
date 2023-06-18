@@ -72,7 +72,7 @@ impl<const W: usize, const H: usize> PartialEq for Frame<W, H> {
 impl<const W: usize, const H: usize> Eq for Frame<W, H> {}
 
 fn extract_frames<const W: usize, const H: usize>(in_file: &str) -> Output {
-    let filter = format!("[0:v:0]scale={W}:{H}[v];");
+    let filter = format!("[0:v:0]scale={W}:{H}");
     let args = vec![
         // "-ss",
         // "0",
@@ -81,11 +81,11 @@ fn extract_frames<const W: usize, const H: usize>(in_file: &str) -> Output {
         "-filter_complex",
         &filter,
 
-        "-map",
-        "[v]",
+        // "-map",
+        // "[v]",
 
         // "-t",
-        // "00:00:10",
+        // "00:00:30",
 
         // "-vsync",
         // "0",
