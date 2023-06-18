@@ -333,7 +333,7 @@ fn main() {
 
     let skip_start = *args.get_one::<f32>("skip-start").unwrap_or(&0.0);
     let skip_end = *args.get_one::<f32>("skip-end").unwrap_or(&0.0);
-    let find_tempo = *args.get_one::<bool>("skip-tempo").unwrap_or(&true);
+    let find_tempo = !*args.get_one::<bool>("skip-tempo").unwrap_or(&false);
     let ref_file = args
         .get_one::<String>("ref_file")
         .expect("Reference file required")
