@@ -293,8 +293,9 @@ const HEIGHT: usize = 20;
 
 const LONG_DESCRIPTION: &str = "
 Typical usage is to sync the audio of two versions of the same video.
-This software compares the photage and provides an offset and scale
+This software compares the photage and provides an offset and tempo
 for adjusting the target file audio so that it matches the reference file.
+By default, only offsets are searched for.
 
 NOTE: Requires ffmpeg to be installed.
 
@@ -308,7 +309,7 @@ fn main() {
     ///////////////////////////////////////////////////////////////////////////////////////////
     let args = Command::new("videodiff")
         .version("0.1.0")
-        .about("Find time offset and scaling between two versions of the same video.")
+        .about("Find time offset and tempo difference between two versions of the same video.")
         .after_help(LONG_DESCRIPTION)
         .arg(Arg::new("ref_file").required(true))
         .arg(Arg::new("target_file").required(true))
@@ -322,11 +323,17 @@ fn main() {
                 .value_parser(clap::value_parser!(f32))
                 .help("Seconds to skip at end of file"),
         )
+        .arg(
+            clap::arg!(--"skip-tempo")
+                .value_parser(clap::value_parser!(bool))
+                .help("Don't search for tempo. Tempo will be set to 1.0x"),
+        )
         .arg_required_else_help(true)
         .get_matches();
 
     let skip_start = *args.get_one::<f32>("skip-start").unwrap_or(&0.0);
     let skip_end = *args.get_one::<f32>("skip-end").unwrap_or(&0.0);
+    let find_tempo = *args.get_one::<bool>("skip-tempo").unwrap_or(&true);
     let ref_file = args
         .get_one::<String>("ref_file")
         .expect("Reference file required")
@@ -449,6 +456,7 @@ fn main() {
 
     let evaluate_fit = |offset: f64, scale: f64| {
         let mut error = 0.0;
+        let scale = if find_tempo {scale} else  { 1.0 };
 
         // let sample_count_12_percent = ref_and_target_timestamps.len() >> 3;
         
@@ -514,7 +522,7 @@ fn main() {
                 eprintln!(
                     "  - [Result] - {offset_label}: {:.5}s, atempo: {:.8}, error: {:.2}",
                     best_offset.abs(),
-                    1.0 / best_scale,
+                    if find_tempo { 1.0 / best_scale } else { 1.0 },
                     best_score
                 );
             }
@@ -535,7 +543,7 @@ fn main() {
     eprintln!(
         "  - [Result] - {offset_label}: {:.5}s, atempo: {:.8}, error: {:.2}",
         best_offset.abs(),
-        1.0 / best_scale,
+        if find_tempo { 1.0 / best_scale } else { 1.0 },
         best_score
     );
     if best_score as usize > ref_and_target_timestamps.len() {
