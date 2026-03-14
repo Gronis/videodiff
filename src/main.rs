@@ -423,8 +423,8 @@ fn main() {
         let old_sample_size = ref_and_target_timestamps.len();
         ref_and_target_timestamps = ref_and_target_timestamps
             .windows(3)
-            .flat_map(|arg| { 
-                let [(_, (_, mean1)), (_, (_, mean2)), (_, (_, mean3))] = arg else { return None }; 
+            .flat_map(|arg| {
+                let [(_, (_, mean1)), (_, (_, mean2)), (_, (_, mean3))] = arg else { return None };
                 let [_, val, _] = arg else { return None };
                 if *mean1 <= *mean2 && *mean2 <= *mean3 { Some(*val) } else { None }
             })
@@ -432,8 +432,8 @@ fn main() {
         if old_sample_size - ref_and_target_timestamps.len() <= 2 { break }
     };
     let monotonous_frames_count = ref_and_target_timestamps.len();
-    eprintln!("  - Got {} comparable frames, {} dropped", 
-        monotonous_frames_count, 
+    eprintln!("  - Got {} comparable frames, {} dropped",
+        monotonous_frames_count,
         non_monotonous_frames_count - monotonous_frames_count
     );
 
@@ -459,7 +459,7 @@ fn main() {
         let scale = if find_tempo {scale} else  { 1.0 };
 
         // let sample_count_12_percent = ref_and_target_timestamps.len() >> 3;
-        
+
         // // Add extra error weight to last and first 12.5% of frames.
         // for (_, (ref_ts, target_ts)) in &ref_and_target_timestamps[0..sample_count_12_percent] {
         //     error += (ref_ts - target_ts * scale + offset).powi(2) * 5.0;
