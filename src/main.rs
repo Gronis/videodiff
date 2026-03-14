@@ -148,7 +148,7 @@ fn parse_fps(bytestream: Vec<u8>) -> f32 {
     fps
 }
 
-fn images_from_bytestream(data: &[u8]) -> Vec<Tga<Rgb888>> {
+fn images_from_bytestream(data: &[u8]) -> Vec<Tga<'_, Rgb888>> {
     let mut frames: Vec<Tga<Rgb888>> = vec![];
     let mut start: usize = 0;
     let mut end: usize = 0;
