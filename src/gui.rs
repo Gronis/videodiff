@@ -180,28 +180,38 @@ impl eframe::App for VideoDiffGui {
 
             // reference video
             ui.horizontal(|ui| {
-                if ui.button("Reference video").clicked() {
+                ui.label("Reference video");
+                if ui.button("Browse...").clicked() {
                     if let Some(file) = FileDialog::new().pick_file() {
                         self.ref_file = Some(file.display().to_string());
                     }
                 }
 
-                if let Some(file) = &self.ref_file {
-                    ui.label(file);
-                }
+                let mut no_file = "".to_string();
+                let file = self.ref_file.as_mut().unwrap_or(&mut no_file);
+                ui.add(
+                    egui::TextEdit::singleline(file)
+                        .desired_width(f32::INFINITY)
+                        .hint_text("Click to browse or paste path here…")
+                );
             });
 
             // target video
             ui.horizontal(|ui| {
-                if ui.button("Target video").clicked() {
+                ui.label("Target video");
+                if ui.button("Browse...").clicked() {
                     if let Some(file) = FileDialog::new().pick_file() {
                         self.target_file = Some(file.display().to_string());
                     }
                 }
 
-                if let Some(file) = &self.target_file {
-                    ui.label(file);
-                }
+                let mut no_file = "".to_string();
+                let file = self.target_file.as_mut().unwrap_or(&mut no_file);
+                ui.add(
+                    egui::TextEdit::singleline(file)
+                        .desired_width(f32::INFINITY)
+                        .hint_text("Click to browse or paste path here…")
+                );
             });
 
             ui.separator();
